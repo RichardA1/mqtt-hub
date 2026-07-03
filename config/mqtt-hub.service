@@ -1,0 +1,27 @@
+# mqtt-hub.service — brings up the full MQTT Hub stack at boot.
+#
+# Installed by setup.sh to /etc/systemd/system/mqtt-hub.service and enabled
+# with `systemctl enable mqtt-hub`. This is what makes the AP, broker, and
+# captive portal survive a power cycle without manual intervention — hostapd/
+# dnsmasq/mosquitto/nginx are already systemd-enabled individually, but the
+# wlan0 static-IP assignment and iptables rules are not persistent on their
+# own, so this unit re-applies them (via scripts/start-ap.sh) every boot.
+#
+# Ordered after NetworkManager so wlan0 exists and NetworkManager has already
+# read its "unmanaged" config before we touch the interface.
+
+[Unit]
+Description=MQTT Hub - WiFi AP + MQTT broker + captive portal
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# NOTE: setup.sh rewrites this path to match wherever you cloned the repo.
+# If installing by hand, edit both lines below to your actual repo path.
+ExecStart=/bin/bash -c 'cd __REPO_ROOT__ && bash scripts/start-ap.sh'
+ExecStop=/bin/bash -c 'cd __REPO_ROOT__ && bash scripts/stop-ap.sh'
+
+[Install]
+WantedBy=multi-user.target

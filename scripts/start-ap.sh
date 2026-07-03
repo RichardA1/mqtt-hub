@@ -9,9 +9,33 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo "==> Unblocking WiFi (rfkill)..."
 rfkill unblock wifi || true
+sleep 1
 
-echo "==> Restarting dhcpcd..."
-systemctl restart dhcpcd
+# Modern Raspberry Pi OS (Bookworm/Trixie) uses NetworkManager and has no
+# dhcpcd.service at all. Older Raspberry Pi OS (Bullseye and earlier) uses
+# dhcpcd. Detect which is present and do the right thing for each.
+if systemctl list-unit-files dhcpcd.service &>/dev/null; then
+  echo "==> dhcpcd detected — restarting it to apply the static wlan0 IP..."
+  systemctl restart dhcpcd
+
+elif systemctl list-unit-files NetworkManager.service &>/dev/null; then
+  echo "==> NetworkManager detected — configuring wlan0 as unmanaged..."
+  UNMANAGED_CONF="/etc/NetworkManager/conf.d/unmanaged-wlan0.conf"
+  if [[ ! -f "$UNMANAGED_CONF" ]]; then
+    cp "${REPO_ROOT}/config/networkmanager-unmanaged.conf" "$UNMANAGED_CONF"
+    systemctl restart NetworkManager
+    sleep 2
+  fi
+
+  echo "==> Assigning static IP to wlan0..."
+  ip addr flush dev wlan0
+  ip addr add 192.168.4.1/24 dev wlan0
+  ip link set wlan0 up
+
+else
+  echo "!! Neither dhcpcd nor NetworkManager found — you'll need to set"
+  echo "!! wlan0's static IP (192.168.4.1/24) manually for your network stack."
+fi
 
 echo "==> Starting hostapd (WiFi AP)..."
 systemctl unmask hostapd

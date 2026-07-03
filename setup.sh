@@ -53,13 +53,25 @@ if [[ -f /etc/dnsmasq.conf && ! -f /etc/dnsmasq.conf.orig ]]; then
 fi
 cp "${REPO_ROOT}/config/dnsmasq.conf" /etc/dnsmasq.conf
 
-echo "==> Appending static-IP block to dhcpcd.conf..."
-if ! grep -q "MQTT Hub static wlan0" /etc/dhcpcd.conf 2>/dev/null; then
-  {
-    echo ""
-    echo "# --- MQTT Hub static wlan0 ---"
-    cat "${REPO_ROOT}/config/dhcpcd.conf"
-  } >> /etc/dhcpcd.conf
+echo "==> Configuring wlan0 static IP for your network stack..."
+if systemctl list-unit-files dhcpcd.service &>/dev/null; then
+  echo "    (dhcpcd detected — using classic dhcpcd.conf approach)"
+  if ! grep -q "MQTT Hub static wlan0" /etc/dhcpcd.conf 2>/dev/null; then
+    {
+      echo ""
+      echo "# --- MQTT Hub static wlan0 ---"
+      cat "${REPO_ROOT}/config/dhcpcd.conf"
+    } >> /etc/dhcpcd.conf
+  fi
+elif systemctl list-unit-files NetworkManager.service &>/dev/null; then
+  echo "    (NetworkManager detected — marking wlan0 unmanaged)"
+  cp "${REPO_ROOT}/config/networkmanager-unmanaged.conf" \
+     /etc/NetworkManager/conf.d/unmanaged-wlan0.conf
+  systemctl restart NetworkManager
+  sleep 2
+else
+  echo "    !! Neither dhcpcd nor NetworkManager detected. You'll need to"
+  echo "    !! assign wlan0 a static 192.168.4.1/24 address yourself."
 fi
 
 echo "==> Installing mosquitto.conf..."
@@ -80,6 +92,12 @@ nginx -t
 echo "==> Enabling services on boot..."
 systemctl unmask hostapd
 systemctl enable hostapd dnsmasq mosquitto nginx
+
+echo "==> Installing mqtt-hub.service (re-applies wlan0 IP + iptables at boot)..."
+sed "s|__REPO_ROOT__|${REPO_ROOT}|g" "${REPO_ROOT}/config/mqtt-hub.service" \
+  > /etc/systemd/system/mqtt-hub.service
+systemctl daemon-reload
+systemctl enable mqtt-hub
 
 echo "==> Starting services..."
 bash "${REPO_ROOT}/scripts/start-ap.sh"
