@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MQTT Hub — WLED Control</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="brand" href="index.html">mqtt-hub</a>
+    <nav>
+      <a href="index.html">dashboard</a>
+      <a href="wled.html" class="active">wled</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="panel">
+      <div class="status-line">
+        <span id="status-dot" class="dot offline"></span>
+        <span>broker: <span id="broker-host">—</span></span>
+        <span>·</span>
+        <span id="status-text">disconnected</span>
+      </div>
+      <div class="hint">Auto-connects on load and reconnects on drop. Listens on wled/+/status and wled/+/v for device discovery.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Devices</h2>
+      <div class="device-chips" id="device-chips">
+        <span class="chip">no devices seen yet</span>
+      </div>
+      <label for="device-select">Target</label>
+      <select id="device-select">
+        <option value="ALL">ALL devices</option>
+      </select>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Power</h2>
+        <div class="row" style="align-items:center;">
+          <label class="toggle" style="flex: 0 0 auto;">
+            <input type="checkbox" id="power-toggle">
+            <span class="slider"></span>
+          </label>
+          <span id="power-label">off</span>
+        </div>
+
+        <h2 style="margin-top:16px;">Brightness</h2>
+        <label for="brightness-slider">Level: <span class="brightness-value" id="brightness-value">128</span> / 255</label>
+        <input type="range" id="brightness-slider" min="0" max="255" value="128">
+      </div>
+
+      <div class="panel">
+        <h2>Color</h2>
+        <label for="color-picker">Segment color</label>
+        <input type="color" id="color-picker" value="#39ff88">
+        <button id="btn-send-color" class="primary">Apply Color</button>
+
+        <h2 style="margin-top:16px;">Preset / Effect</h2>
+        <label for="preset-select">Preset slot</label>
+        <select id="preset-select">
+          <option value="0">0 — none</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+        <button id="btn-send-preset">Apply Preset</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Last Sent</h2>
+      <div class="last-sent" id="last-sent">nothing sent yet</div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      const CLIENT_ID = "hub-wled-" + Math.random().toString(16).slice(2, 10);
+      const RECONNECT_DELAY_MS = 3000;
+
+      const state = {
+        client: null,
+        connected: false,
+        devices: new Set(), // device ids seen via wled/+/status or wled/+/v
+      };
+
+      const el = {
+        statusDot: document.getElementById("status-dot"),
+        statusText: document.getElementById("status-text"),
+        brokerHost: document.getElementById("broker-host"),
+
+        deviceChips: document.getElementById("device-chips"),
+        deviceSelect: document.getElementById("device-select"),
+
+        powerToggle: document.getElementById("power-toggle"),
+        powerLabel: document.getElementById("power-label"),
+
+        brightnessSlider: document.getElementById("brightness-slider"),
+        brightnessValue: document.getElementById("brightness-value"),
+
+        colorPicker: document.getElementById("color-picker"),
+        sendColorBtn: document.getElementById("btn-send-color"),
+
+        presetSelect: document.getElementById("preset-select"),
+        sendPresetBtn: document.getElementById("btn-send-preset"),
+
+        lastSent: document.getElementById("last-sent"),
+      };
+
+      function setStatus(connected) {
+        state.connected = connected;
+        el.statusDot.classList.toggle("online", connected);
+        el.statusDot.classList.toggle("offline", !connected);
+        el.statusText.textContent = connected ? "connected" : "disconnected";
+      }
+
+      function hexToRgb(hex) {
+        const clean = hex.replace("#", "");
+        const num = parseInt(clean, 16);
+        return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+      }
+
+      function targetTopics() {
+        const target = el.deviceSelect.value;
+        if (target === "ALL") {
+          if (state.devices.size === 0) {
+            // No devices discovered yet — broadcast to a wildcard-friendly
+            // convention some WLED setups listen on, plus warn in Last Sent.
+            return { target: "ALL", topics: ["wled/all/api"] };
+          }
+          return {
+            target: "ALL",
+            topics: Array.from(state.devices).map((d) => "wled/" + d + "/api"),
+          };
+        }
+        return { target, topics: ["wled/" + target + "/api"] };
+      }
+
+      function showLastSent(target, topics, payloadObj) {
+        const payloadStr = JSON.stringify(payloadObj);
+        el.lastSent.innerHTML =
+          '<span class="k">target:</span> <span class="v">' + target + "</span>\n" +
+          '<span class="k">topic(s):</span> <span class="v">' + topics.join(", ") + "</span>\n" +
+          '<span class="k">payload:</span> <span class="v">' + payloadStr + "</span>";
+      }
+
+      function publishApi(payloadObj) {
+        if (!state.client || !state.connected) return;
+        const { target, topics } = targetTopics();
+        const payloadStr = JSON.stringify(payloadObj);
+
+        topics.forEach((topic) => {
+          const message = new Paho.MQTT.Message(payloadStr);
+          message.destinationName = topic;
+          message.qos = 0;
+          state.client.send(message);
+        });
+
+        showLastSent(target, topics, payloadObj);
+      }
+
+      function addDevice(deviceId) {
+        if (!deviceId || state.devices.has(deviceId)) return;
+        state.devices.add(deviceId);
+
+        // Add to dropdown
+        const opt = document.createElement("option");
+        opt.value = deviceId;
+        opt.textContent = deviceId;
+        el.deviceSelect.appendChild(opt);
+
+        renderChips();
+      }
+
+      function renderChips() {
+        el.deviceChips.innerHTML = "";
+        if (state.devices.size === 0) {
+          const span = document.createElement("span");
+          span.className = "chip";
+          span.textContent = "no devices seen yet";
+          el.deviceChips.appendChild(span);
+          return;
+        }
+        state.devices.forEach((d) => {
+          const span = document.createElement("span");
+          span.className = "chip seen";
+          span.textContent = d;
+          el.deviceChips.appendChild(span);
+        });
+      }
+
+      function extractDeviceId(topic) {
+        // wled/{device}/status  or  wled/{device}/v
+        const parts = topic.split("/");
+        return parts.length >= 2 ? parts[1] : null;
+      }
+
+      function connect() {
+        const host = window.location.hostname || "192.168.4.1";
+        el.brokerHost.textContent = host + ":9001/mqtt";
+
+        const client = new Paho.MQTT.Client(host, Number(9001), "/mqtt", CLIENT_ID);
+
+        client.onConnectionLost = function () {
+          setStatus(false);
+          setTimeout(connect, RECONNECT_DELAY_MS);
+        };
+
+        client.onMessageArrived = function (message) {
+          const deviceId = extractDeviceId(message.destinationName);
+          if (deviceId) addDevice(deviceId);
+        };
+
+        client.connect({
+          useSSL: window.location.protocol === "https:",
+          timeout: 8,
+          onSuccess: function () {
+            setStatus(true);
+            client.subscribe("wled/+/status", { qos: 0 });
+            client.subscribe("wled/+/v", { qos: 0 });
+          },
+          onFailure: function () {
+            setStatus(false);
+            setTimeout(connect, RECONNECT_DELAY_MS);
+          },
+        });
+
+        state.client = client;
+      }
+
+      // --- Controls ---
+
+      el.powerToggle.addEventListener("change", function () {
+        const on = el.powerToggle.checked;
+        el.powerLabel.textContent = on ? "on" : "off";
+        publishApi({ on });
+      });
+
+      el.brightnessSlider.addEventListener("input", function () {
+        el.brightnessValue.textContent = el.brightnessSlider.value;
+      });
+
+      el.brightnessSlider.addEventListener("change", function () {
+        publishApi({ bri: Number(el.brightnessSlider.value) });
+      });
+
+      el.sendColorBtn.addEventListener("click", function () {
+        const rgb = hexToRgb(el.colorPicker.value);
+        publishApi({ seg: [{ col: [rgb] }] });
+      });
+
+      el.sendPresetBtn.addEventListener("click", function () {
+        publishApi({ ps: Number(el.presetSelect.value) });
+      });
+
+      connect();
+    })();
+  </script>
+</body>
+</html>

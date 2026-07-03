@@ -1,0 +1,68 @@
+# /etc/nginx/sites-available/mqtt-hub
+#
+# Serves the MQTT Hub dashboard, proxies MQTT-over-WebSocket at /mqtt,
+# and answers every OS's "captive portal" connectivity-check URL with a
+# 302 so phones/laptops pop the sign-in page automatically.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /var/www/mqtt-hub;
+    index index.html;
+
+    # --- Static site ---
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /css/ {
+        alias /var/www/mqtt-hub/css/;
+    }
+
+    location /js/ {
+        alias /var/www/mqtt-hub/js/;
+    }
+
+    # --- MQTT over WebSocket, proxied to Mosquitto on 9001 ---
+    location /mqtt {
+        proxy_pass http://127.0.0.1:9001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # =========================================================
+    # Captive portal connectivity-check endpoints
+    # Every OS pings one of these to decide whether to show the
+    # "sign in to network" prompt. We answer with a 302 to "/"
+    # so the prompt opens straight into the dashboard.
+    # =========================================================
+
+    # Android
+    location = /generate_204 { return 302 http://192.168.4.1/; }
+    location = /gen_204 { return 302 http://192.168.4.1/; }
+    location = /connectivitycheck { return 302 http://192.168.4.1/; }
+
+    # Apple (iOS / macOS)
+    location = /hotspot-detect.html { return 302 http://192.168.4.1/; }
+    location = /library/test/success.html { return 302 http://192.168.4.1/; }
+
+    # Windows
+    location = /connecttest.txt { return 302 http://192.168.4.1/; }
+    location = /ncsi.txt { return 302 http://192.168.4.1/; }
+    location = /redirect { return 302 http://192.168.4.1/; }
+
+    # Firefox
+    location = /canonical.html { return 302 http://192.168.4.1/; }
+    location = /success.txt { return 302 http://192.168.4.1/; }
+
+    # Samsung
+    location = /check_network { return 302 http://192.168.4.1/; }
+
+    error_page 404 /index.html;
+}

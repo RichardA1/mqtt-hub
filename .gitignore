@@ -1,0 +1,19 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Local override configs (don't commit real WiFi passwords/secrets)
+config/*.local.conf
+secrets.env
+
+# Build/test artifacts
+*.tar.gz
+node_modules/

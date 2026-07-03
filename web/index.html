@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MQTT Hub — Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <a class="brand" href="index.html">mqtt-hub</a>
+    <nav>
+      <a href="index.html" class="active">dashboard</a>
+      <a href="wled.html">wled</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="panel">
+      <div class="status-line">
+        <span id="status-dot" class="dot offline"></span>
+        <span>broker: <span id="broker-host">—</span></span>
+        <span>·</span>
+        <span id="status-text">disconnected</span>
+      </div>
+      <div class="row">
+        <button id="btn-connect" class="primary">Connect</button>
+        <button id="btn-disconnect" class="danger" disabled>Disconnect</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Subscribe</h2>
+        <label for="sub-topic">Topic filter</label>
+        <input type="text" id="sub-topic" placeholder="e.g. wled/+/status or #">
+        <div class="row">
+          <div>
+            <label for="sub-qos">QoS</label>
+            <select id="sub-qos">
+              <option value="0">0 — at most once</option>
+              <option value="1">1 — at least once</option>
+              <option value="2">2 — exactly once</option>
+            </select>
+          </div>
+          <button id="btn-subscribe" disabled>Subscribe</button>
+        </div>
+
+        <ul class="sub-list" id="sub-list"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>Publish</h2>
+        <label for="pub-topic">Topic</label>
+        <input type="text" id="pub-topic" placeholder="e.g. wled/livingroom/api">
+
+        <label for="pub-payload">Payload</label>
+        <textarea id="pub-payload" placeholder='e.g. {"on": true}'></textarea>
+
+        <div class="row">
+          <div>
+            <label for="pub-qos">QoS</label>
+            <select id="pub-qos">
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </div>
+          <div class="checkbox-row" style="margin-bottom: 10px;">
+            <input type="checkbox" id="pub-retain">
+            <label for="pub-retain">Retain</label>
+          </div>
+        </div>
+        <button id="btn-publish" class="primary" disabled>Publish</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Message Feed <span style="float:right;"><button id="btn-clear-feed" class="small">clear</button></span></h2>
+      <div class="feed" id="feed"></div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

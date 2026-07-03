@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Build tarball
+        run: |
+          ARCHIVE_NAME="mqtt-hub-${{ steps.version.outputs.version }}.tar.gz"
+          mkdir -p /tmp/mqtt-hub
+          rsync -a --exclude='.git' --exclude='.github' ./ /tmp/mqtt-hub/
+          tar -czf "${ARCHIVE_NAME}" -C /tmp mqtt-hub
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
+
+      - name: Create release notes
+        run: |
+          cat > RELEASE_NOTES.md << EOF
+          # mqtt-hub ${{ steps.version.outputs.version }}
+
+          Self-contained WiFi AP + MQTT Broker + WLED Controller + Captive
+          Portal for the Raspberry Pi Zero W.
+
+          ## Install
+
+          \`\`\`bash
+          tar -xzf ${{ env.archive_name }}
+          cd mqtt-hub
+          sudo ./setup.sh
+          \`\`\`
+
+          See [MANUAL_SETUP.md](docs/MANUAL_SETUP.md) for a step-by-step
+          walkthrough, or [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) if
+          something doesn't come up cleanly.
+
+          **Before deploying:** edit \`config/hostapd.conf\` and change the
+          placeholder WiFi password (\`ChangeMe_MqttHub!\`) to something real.
+          EOF
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: mqtt-hub ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: ${{ env.archive_name }}
+          draft: false
+          prerelease: false

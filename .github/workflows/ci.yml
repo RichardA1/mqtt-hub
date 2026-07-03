@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: "."
+          ignore_paths: >-
+            .git
+          severity: warning
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+
+  html-validate:
+    name: HTML Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install html-validate
+        run: npm install -g html-validate
+      - name: Validate index.html
+        run: html-validate web/index.html
+      - name: Validate wled.html
+        run: html-validate web/wled.html
+
+  nginx-validate:
+    name: Nginx Config Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nginx
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nginx
+      - name: Install site config
+        run: |
+          sudo mkdir -p /var/www/mqtt-hub
+          sudo cp -r web/* /var/www/mqtt-hub/
+          sudo cp config/nginx-mqtt-hub /etc/nginx/sites-available/mqtt-hub
+          sudo ln -sf /etc/nginx/sites-available/mqtt-hub /etc/nginx/sites-enabled/mqtt-hub
+          sudo rm -f /etc/nginx/sites-enabled/default
+      - name: nginx -t
+        run: sudo nginx -t
+
+  mosquitto-validate:
+    name: Mosquitto Config Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mosquitto
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mosquitto mosquitto-clients
+      - name: Start mosquitto with repo config
+        run: |
+          sudo mkdir -p /var/lib/mosquitto
+          mosquitto -c config/mosquitto.conf -d
+          sleep 2
+      - name: Verify broker is listening on 1883 and 9001
+        run: |
+          ss -tulpn | grep ':1883' 
+          ss -tulpn | grep ':9001'
+      - name: Verify pub/sub works
+        run: |
+          mosquitto_sub -h 127.0.0.1 -p 1883 -t 'ci/test' -C 1 -W 5 > /tmp/sub_out.txt &
+          SUB_PID=$!
+          sleep 1
+          mosquitto_pub -h 127.0.0.1 -p 1883 -t 'ci/test' -m 'ci-message'
+          wait $SUB_PID
+          grep -q 'ci-message' /tmp/sub_out.txt
+
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install ESLint
+        run: npm install -g eslint@8
+      - name: Create minimal ESLint config
+        run: |
+          cat > .eslintrc.json << 'EOF'
+          {
+            "env": { "browser": true, "es2021": true },
+            "parserOptions": { "ecmaVersion": 2021, "sourceType": "script" },
+            "extends": "eslint:recommended",
+            "globals": { "Paho": "readonly" },
+            "rules": {
+              "no-unused-vars": "warn"
+            }
+          }
+          EOF
+      - name: Run ESLint
+        run: eslint web/js/app.js
+
+  css-validate:
+    name: CSS Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install stylelint
+        run: npm install -g stylelint stylelint-config-standard
+      - name: Create minimal stylelint config
+        run: |
+          cat > .stylelintrc.json << 'EOF'
+          {
+            "extends": "stylelint-config-standard",
+            "rules": {
+              "selector-class-pattern": null,
+              "custom-property-pattern": null,
+              "no-descending-specificity": null
+            }
+          }
+          EOF
+      - name: Run stylelint
+        run: stylelint "web/css/style.css"
+
+  integration-smoke-test:
+    name: Integration Smoke Test
+    runs-on: ubuntu-latest
+    needs: [nginx-validate, mosquitto-validate]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stack
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nginx mosquitto mosquitto-clients curl
+
+      - name: Deploy web assets
+        run: |
+          sudo mkdir -p /var/www/mqtt-hub
+          sudo cp -r web/* /var/www/mqtt-hub/
+
+      - name: Install nginx site
+        run: |
+          sudo cp config/nginx-mqtt-hub /etc/nginx/sites-available/mqtt-hub
+          sudo ln -sf /etc/nginx/sites-available/mqtt-hub /etc/nginx/sites-enabled/mqtt-hub
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo nginx -t
+          sudo systemctl restart nginx
+
+      - name: Start mosquitto
+        run: |
+          sudo mkdir -p /var/lib/mosquitto
+          sudo mosquitto -c config/mosquitto.conf -d
+          sleep 2
+
+      - name: Dashboard returns 200
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/index.html)
+          test "$code" = "200"
+
+      - name: WLED page returns 200
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/wled.html)
+          test "$code" = "200"
+
+      - name: Captive portal URLs return 302
+        run: |
+          for path in generate_204 gen_204 connectivitycheck hotspot-detect.html \
+                      library/test/success.html connecttest.txt ncsi.txt redirect \
+                      canonical.html success.txt check_network; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1/${path}")
+            echo "  /${path} -> ${code}"
+            test "$code" = "302"
+          done
+
+      - name: MQTT pub/sub works end-to-end
+        run: |
+          mosquitto_sub -h 127.0.0.1 -p 1883 -t 'smoke/test' -C 1 -W 5 > /tmp/smoke_sub.txt &
+          SUB_PID=$!
+          sleep 1
+          mosquitto_pub -h 127.0.0.1 -p 1883 -t 'smoke/test' -m 'smoke-ok'
+          wait $SUB_PID
+          grep -q 'smoke-ok' /tmp/smoke_sub.txt
+
+      - name: WebSocket port 9001 is listening
+        run: ss -tulpn | grep ':9001'
