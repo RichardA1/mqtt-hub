@@ -94,7 +94,7 @@
     const host = window.location.hostname || "192.168.4.1";
     el.brokerHost.textContent = host + ":9001/mqtt";
 
-    const client = new Paho.MQTT.Client(host, Number(9001), "/mqtt", CLIENT_ID);
+    const client = new Paho.Client(host, Number(9001), "/mqtt", CLIENT_ID);
 
     client.onConnectionLost = function (resp) {
       setStatus(false);
@@ -195,7 +195,7 @@
     const qos = Number(el.pubQos.value);
     const retain = el.pubRetain.checked;
 
-    const message = new Paho.MQTT.Message(payload);
+    const message = new Paho.Message(payload);
     message.destinationName = topic;
     message.qos = qos;
     message.retained = retain;

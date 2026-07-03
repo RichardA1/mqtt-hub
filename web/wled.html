@@ -82,7 +82,7 @@
     </div>
   </main>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+  <script src="js/paho-mqtt-min.js"></script>
   <script>
     (function () {
       "use strict";
@@ -162,7 +162,7 @@
         const payloadStr = JSON.stringify(payloadObj);
 
         topics.forEach((topic) => {
-          const message = new Paho.MQTT.Message(payloadStr);
+          const message = new Paho.Message(payloadStr);
           message.destinationName = topic;
           message.qos = 0;
           state.client.send(message);
@@ -211,7 +211,7 @@
         const host = window.location.hostname || "192.168.4.1";
         el.brokerHost.textContent = host + ":9001/mqtt";
 
-        const client = new Paho.MQTT.Client(host, Number(9001), "/mqtt", CLIENT_ID);
+        const client = new Paho.Client(host, Number(9001), "/mqtt", CLIENT_ID);
 
         client.onConnectionLost = function () {
           setStatus(false);
