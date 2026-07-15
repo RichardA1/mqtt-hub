@@ -1,10 +1,8 @@
 # mqtt-hub
 
-[![CI](https://github.com/YOUR_USERNAME/mqtt-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/mqtt-hub/actions/workflows/ci.yml)
-[![Release](https://github.com/YOUR_USERNAME/mqtt-hub/actions/workflows/release.yml/badge.svg)](https://github.com/YOUR_USERNAME/mqtt-hub/actions/workflows/release.yml)
+[![CI](https://github.com/RichardA1/mqtt-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/RichardA1/mqtt-hub/actions/workflows/ci.yml)
+[![Release](https://github.com/RichardA1/mqtt-hub/actions/workflows/release.yml/badge.svg)](https://github.com/RichardA1/mqtt-hub/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
-> Replace `YOUR_USERNAME` above with your GitHub username once this repo is pushed.
 
 A self-contained WiFi Access Point + MQTT Broker + WLED LED Controller +
 Captive Portal, designed to run on a Raspberry Pi Zero W with no internet
