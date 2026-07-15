@@ -40,15 +40,15 @@
     <div class="grid">
       <div class="panel">
         <h2>Power</h2>
-        <div class="row" style="align-items:center;">
-          <label class="toggle" style="flex: 0 0 auto;">
+        <div class="row row--align-center">
+          <label class="toggle toggle--fixed">
             <input type="checkbox" id="power-toggle">
             <span class="slider"></span>
           </label>
           <span id="power-label">off</span>
         </div>
 
-        <h2 style="margin-top:16px;">Brightness</h2>
+        <h2 class="mt-16">Brightness</h2>
         <label for="brightness-slider">Level: <span class="brightness-value" id="brightness-value">128</span> / 255</label>
         <input type="range" id="brightness-slider" min="0" max="255" value="128">
       </div>
@@ -57,9 +57,9 @@
         <h2>Color</h2>
         <label for="color-picker">Segment color</label>
         <input type="color" id="color-picker" value="#39ff88">
-        <button id="btn-send-color" class="primary">Apply Color</button>
+        <button type="button" id="btn-send-color" class="primary">Apply Color</button>
 
-        <h2 style="margin-top:16px;">Preset / Effect</h2>
+        <h2 class="mt-16">Preset / Effect</h2>
         <label for="preset-select">Preset slot</label>
         <select id="preset-select">
           <option value="0">0 — none</option>
@@ -72,7 +72,7 @@
           <option value="7">7</option>
           <option value="8">8</option>
         </select>
-        <button id="btn-send-preset">Apply Preset</button>
+        <button type="button" id="btn-send-preset">Apply Preset</button>
       </div>
     </div>
 

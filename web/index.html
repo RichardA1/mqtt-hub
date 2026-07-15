@@ -24,8 +24,8 @@
         <span id="status-text">disconnected</span>
       </div>
       <div class="row">
-        <button id="btn-connect" class="primary">Connect</button>
-        <button id="btn-disconnect" class="danger" disabled>Disconnect</button>
+        <button type="button" id="btn-connect" class="primary">Connect</button>
+        <button type="button" id="btn-disconnect" class="danger" disabled>Disconnect</button>
       </div>
     </div>
 
@@ -43,7 +43,7 @@
               <option value="2">2 — exactly once</option>
             </select>
           </div>
-          <button id="btn-subscribe" disabled>Subscribe</button>
+          <button type="button" id="btn-subscribe" disabled>Subscribe</button>
         </div>
 
         <ul class="sub-list" id="sub-list"></ul>
@@ -66,17 +66,17 @@
               <option value="2">2</option>
             </select>
           </div>
-          <div class="checkbox-row" style="margin-bottom: 10px;">
+          <div class="checkbox-row">
             <input type="checkbox" id="pub-retain">
             <label for="pub-retain">Retain</label>
           </div>
         </div>
-        <button id="btn-publish" class="primary" disabled>Publish</button>
+        <button type="button" id="btn-publish" class="primary" disabled>Publish</button>
       </div>
     </div>
 
     <div class="panel">
-      <h2>Message Feed <span style="float:right;"><button id="btn-clear-feed" class="small">clear</button></span></h2>
+      <h2>Message Feed <span class="panel-header-action"><button type="button" id="btn-clear-feed" class="small">clear</button></span></h2>
       <div class="feed" id="feed"></div>
     </div>
   </main>

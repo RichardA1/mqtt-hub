@@ -67,8 +67,13 @@ jobs:
           sudo apt-get install -y mosquitto mosquitto-clients
       - name: Start mosquitto with repo config
         run: |
+          # apt-get install auto-starts mosquitto.service with the stock
+          # config; stop it first or our instance can't bind the same ports
+          # (and the job would silently end up testing the stock config).
+          sudo systemctl stop mosquitto
+          sudo systemctl disable mosquitto
           sudo mkdir -p /var/lib/mosquitto
-          mosquitto -c config/mosquitto.conf -d
+          sudo mosquitto -c config/mosquitto.conf -d
           sleep 2
       - name: Verify broker is listening on 1883 and 9001
         run: |
@@ -161,6 +166,8 @@ jobs:
 
       - name: Start mosquitto
         run: |
+          sudo systemctl stop mosquitto
+          sudo systemctl disable mosquitto
           sudo mkdir -p /var/lib/mosquitto
           sudo mosquitto -c config/mosquitto.conf -d
           sleep 2
