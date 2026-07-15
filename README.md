@@ -57,7 +57,7 @@ dashboard and WLED controller.
 ## Quick start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/mqtt-hub.git
+git clone https://github.com/RichardA1/mqtt-hub.git
 cd mqtt-hub
 sudo ./setup.sh
 ```
